@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   update:
@@ -22,6 +23,9 @@ jobs:
 
       - run: python fetch_tif_data.py
 
+      - name: Sanity-check the refreshed data
+        run: python validate_data.py
+
       - name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"
@@ -30,3 +34,13 @@ jobs:
           git diff --cached --quiet && echo "No changes" && exit 0
           git commit -m "Data refresh: $(date -u +%Y-%m-%d)"
           git push
+
+      - name: Open an issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "TIF data refresh failed ($(date -u +%Y-%m-%d))" \
+            --body "The scheduled data refresh failed — DOR may have changed a file shape, or the sanity check rejected the output. Nothing was committed. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
