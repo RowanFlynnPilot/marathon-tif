@@ -68,6 +68,29 @@ function FinanceBars({ financials }) {
   );
 }
 
+function CopyLink({ id }) {
+  const [copied, setCopied] = useState(false);
+  // Inside the iframe, location is still the GitHub Pages URL, so this
+  // yields the canonical standalone link in both contexts.
+  const url = `${window.location.origin}${window.location.pathname}?district=${id}`;
+  return (
+    <button
+      className="copylink"
+      onClick={() => {
+        navigator.clipboard.writeText(url).then(
+          () => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          },
+          () => window.prompt("Copy this link:", url)
+        );
+      }}
+    >
+      {copied ? "Link copied ✓" : "Copy link to this district"}
+    </button>
+  );
+}
+
 function Lifecycle({ createdDate, terminationDate }) {
   if (!createdDate || !terminationDate) return null;
   const start = new Date(createdDate).getTime();
@@ -174,6 +197,7 @@ export default function District({ snap, maxAbsOutlook, initialOpen = false }) {
             <div><dt>Fund balance</dt><dd>{money(snap.fin.endingBalance)}</dd></div>
             <div><dt>Filed outlook</dt><dd>{money(snap.fin.surplus)}</dd></div>
           </dl>
+          <CopyLink id={snap.id} />
         </div>
       )}
     </div>

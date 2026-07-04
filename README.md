@@ -32,7 +32,8 @@ the standalone page.
 
 ```html
 <iframe id="marathon-tif" src="https://rowanflynnpilot.github.io/marathon-tif/"
-        style="width: 100%; border: 0;" title="The TIF Scorecard"></iframe>
+        style="width: 100%; border: 0;" title="The TIF Scorecard"
+        allow="clipboard-write"></iframe>
 <script>
   (function () {
     var frame = document.getElementById("marathon-tif");
