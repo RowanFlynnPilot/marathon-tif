@@ -36,7 +36,9 @@ function useWidth() {
 }
 
 function ChartTip({ x, width, children }) {
-  const left = width < 200 ? width / 2 : Math.min(Math.max(x, 95), width - 95);
+  // Widest tooltip (bar chart, full-dollar figures) runs ~220px; keep its
+  // center far enough from the edges that it never bleeds out.
+  const left = width < 240 ? width / 2 : Math.min(Math.max(x, 112), width - 112);
   return (
     <div className="charttip" style={{ left }}>
       {children}
