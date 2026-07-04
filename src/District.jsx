@@ -21,50 +21,173 @@ function BalanceBar({ outlook, maxAbs }) {
   );
 }
 
+// Charts draw 1:1 with their rendered width (no viewBox stretching), so
+// hover math is exact and text stays crisp at every size.
+function useWidth() {
+  const ref = useRef(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    setWidth(ref.current.clientWidth);
+    const ro = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+    ro.observe(ref.current);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, width];
+}
+
+function ChartTip({ x, width, children }) {
+  const left = width < 200 ? width / 2 : Math.min(Math.max(x, 95), width - 95);
+  return (
+    <div className="charttip" style={{ left }}>
+      {children}
+    </div>
+  );
+}
+
 function Sparkline({ values }) {
-  if (values.length < 2) return null;
-  const w = 440, h = 100, pad = 6;
+  const [ref, width] = useWidth();
+  const [hover, setHover] = useState(null);
+  const h = 190, pad = 12, top = 52, bottom = 14;
+  const n = values.length;
   const max = Math.max(...values.map((v) => v.increment));
   const min = Math.min(...values.map((v) => v.increment), 0);
-  const x = (i) => pad + (i / (values.length - 1)) * (w - 2 * pad);
-  const y = (n) => h - pad - ((n - min) / (max - min || 1)) * (h - 2 * pad);
-  const points = values.map((v, i) => `${x(i)},${y(v.increment)}`).join(" ");
+  const x = (i) => pad + (i / (n - 1)) * (width - 2 * pad);
+  const y = (v) => h - bottom - ((v - min) / (max - min || 1)) * (h - top - bottom);
+  const line = values.map((v, i) => `${x(i)},${y(v.increment)}`).join(" ");
+  const onMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const frac = (e.clientX - rect.left - pad) / (rect.width - 2 * pad);
+    setHover(Math.max(0, Math.min(n - 1, Math.round(frac * (n - 1)))));
+  };
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="spark" role="img"
-      aria-label={`Increment ${values[0].year} to ${values[values.length - 1].year}`}>
-      <polyline points={points} fill="none" />
-      <circle cx={x(values.length - 1)} cy={y(values[values.length - 1].increment)} r="4" />
-    </svg>
+    <div ref={ref} className="chartbox" style={{ minHeight: h }}
+      onPointerMove={onMove} onPointerLeave={() => setHover(null)}>
+      {width > 0 && (
+        <>
+          <svg viewBox={`0 0 ${width} ${h}`} width="100%" className="spark" role="img"
+            aria-label={`Increment ${values[0].year} to ${values[n - 1].year}`}>
+            <polygon className="spark__area"
+              points={`${x(0)},${h - bottom} ${line} ${x(n - 1)},${h - bottom}`} />
+            <polyline points={line} fill="none" />
+            {hover === null ? (
+              <circle cx={x(n - 1)} cy={y(values[n - 1].increment)} r="4" />
+            ) : (
+              <g className="spark__hover">
+                <line x1={x(hover)} x2={x(hover)} y1={top - 8} y2={h - bottom} />
+                <circle cx={x(hover)} cy={y(values[hover].increment)} r="5" />
+              </g>
+            )}
+          </svg>
+          {hover !== null && (
+            <ChartTip x={x(hover)} width={width}>
+              <span className="charttip__year">{values[hover].year} increment</span>
+              <span className="charttip__fig">{money(values[hover].increment)}</span>
+            </ChartTip>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 
 function FinanceBars({ financials }) {
-  const w = 440, h = 120, pad = 6;
+  const [ref, width] = useWidth();
+  const [hover, setHover] = useState(null);
+  const h = 210, pad = 12, top = 52, bottom = 24;
+  const n = financials.length;
   const max = Math.max(
     ...financials.map((f) => Math.max(f.taxIncrement, f.debtPrincipal + f.debtInterest)),
     1
   );
-  const band = (w - 2 * pad) / financials.length;
-  const bh = (n) => ((h - 24) * n) / max;
+  const band = (width - 2 * pad) / n;
+  const bh = (v) => ((h - top - bottom) * v) / max;
+  const onMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setHover(Math.max(0, Math.min(n - 1, Math.floor((e.clientX - rect.left - pad) / band))));
+  };
+  const hovered = hover !== null ? financials[hover] : null;
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="finbars" role="img"
-      aria-label="Tax increment collected vs. debt service by year">
-      {financials.map((f, i) => {
-        const x0 = pad + i * band;
-        const debt = f.debtPrincipal + f.debtInterest;
-        return (
-          <g key={f.year}>
-            <rect className="finbars__incr" x={x0 + band * 0.14} width={band * 0.34}
-              y={h - 18 - bh(f.taxIncrement)} height={bh(f.taxIncrement)} />
-            <rect className="finbars__debt" x={x0 + band * 0.52} width={band * 0.34}
-              y={h - 18 - bh(debt)} height={bh(debt)} />
-            <text x={x0 + band / 2} y={h - 4} textAnchor="middle">
-              {String(f.year).slice(2)}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
+    <div ref={ref} className="chartbox" style={{ minHeight: h }}
+      onPointerMove={onMove} onPointerLeave={() => setHover(null)}>
+      {width > 0 && (
+        <>
+          <svg viewBox={`0 0 ${width} ${h}`} width="100%" className="finbars" role="img"
+            aria-label="Tax increment collected vs. debt service by year">
+            {hover !== null && (
+              <rect className="finbars__hi" x={pad + hover * band} width={band}
+                y={top - 8} height={h - bottom - top + 8} />
+            )}
+            {financials.map((f, i) => {
+              const x0 = pad + i * band;
+              const debt = f.debtPrincipal + f.debtInterest;
+              return (
+                <g key={f.year}>
+                  <rect className="finbars__incr" x={x0 + band * 0.14} width={band * 0.34}
+                    y={h - bottom - bh(f.taxIncrement)} height={bh(f.taxIncrement)} />
+                  <rect className="finbars__debt" x={x0 + band * 0.52} width={band * 0.34}
+                    y={h - bottom - bh(debt)} height={bh(debt)} />
+                  <text x={x0 + band / 2} y={h - 8} textAnchor="middle">
+                    {String(f.year).slice(2)}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+          {hovered && (
+            <ChartTip x={pad + hover * band + band / 2} width={width}>
+              <span className="charttip__year">{hovered.year}</span>
+              <span className="charttip__row">
+                <span className="key key--incr">tax increment</span>
+                {money(hovered.taxIncrement)}
+              </span>
+              <span className="charttip__row">
+                <span className="key key--debt">debt service</span>
+                {money(hovered.debtPrincipal + hovered.debtInterest)}
+              </span>
+            </ChartTip>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function ChartTabs({ snap }) {
+  const hasSpark = snap.values.length > 1;
+  const [tab, setTab] = useState(hasSpark ? "increment" : "finance");
+  return (
+    <div className="charts">
+      {hasSpark && (
+        <div className="charts__tabs" role="tablist" aria-label="District charts">
+          <button role="tab" aria-selected={tab === "increment"}
+            className={`tabbtn ${tab === "increment" ? "tabbtn--on" : ""}`}
+            onClick={() => setTab("increment")}>
+            Increment value
+          </button>
+          <button role="tab" aria-selected={tab === "finance"}
+            className={`tabbtn ${tab === "finance" ? "tabbtn--on" : ""}`}
+            onClick={() => setTab("finance")}>
+            Taxes collected vs. debt
+          </button>
+        </div>
+      )}
+      {tab === "increment" ? (
+        <figure>
+          <Sparkline values={snap.values} />
+          <figcaption>
+            Increment, {snap.values[0].year}–{snap.val.year}: {money(snap.values[0].increment)} → {money(snap.val.increment)}
+          </figcaption>
+        </figure>
+      ) : (
+        <figure>
+          <FinanceBars financials={snap.financials} />
+          <figcaption>
+            <span className="key key--incr">tax increment</span> vs{" "}
+            <span className="key key--debt">debt service</span>, by year
+          </figcaption>
+        </figure>
+      )}
+    </div>
   );
 }
 
@@ -172,23 +295,7 @@ export default function District({ snap, maxAbsOutlook, initialOpen = false }) {
           {!snap.staleTermDate && (
             <Lifecycle createdDate={snap.createdDate} terminationDate={snap.terminationDate} />
           )}
-          <div className="detail__charts">
-            {snap.values.length > 1 && (
-              <figure>
-                <Sparkline values={snap.values} />
-                <figcaption>
-                  Increment, {snap.values[0].year}–{snap.val.year}: {money(snap.values[0].increment)} → {money(snap.val.increment)}
-                </figcaption>
-              </figure>
-            )}
-            <figure>
-              <FinanceBars financials={snap.financials} />
-              <figcaption>
-                <span className="key key--incr">tax increment</span> vs{" "}
-                <span className="key key--debt">debt service</span>, by year
-              </figcaption>
-            </figure>
-          </div>
+          <ChartTabs snap={snap} />
           <dl className="detail__figures">
             <div><dt>Base value</dt><dd>{money(snap.val?.baseValue)}</dd></div>
             <div><dt>Current value</dt><dd>{money(snap.val?.currentValue)}</dd></div>
