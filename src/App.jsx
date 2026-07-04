@@ -19,6 +19,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [sort, setSort] = useState("increment");
   const [showClosed, setShowClosed] = useState(false);
+  const [query, setQuery] = useState("");
 
   // A deep link to a terminated district would otherwise land on nothing.
   useEffect(() => {
@@ -43,9 +44,17 @@ export default function App() {
   );
 
   const shown = useMemo(() => {
-    const pool = showClosed ? snaps : snaps.filter((s) => s.status === "active");
+    let pool = showClosed ? snaps : snaps.filter((s) => s.status === "active");
+    const q = query.trim().toLowerCase();
+    if (q) {
+      pool = pool.filter((s) =>
+        `${s.municipality} tid ${s.tidNumber.replace(/^0+/, "")}`
+          .toLowerCase()
+          .includes(q)
+      );
+    }
     return [...pool].sort(SORTS[sort]);
-  }, [snaps, sort, showClosed]);
+  }, [snaps, sort, showClosed, query]);
 
   if (error) {
     return (
@@ -116,6 +125,14 @@ export default function App() {
             </button>
           ))}
         </div>
+        <input
+          type="search"
+          className="controls__filter"
+          placeholder="Filter by community…"
+          aria-label="Filter districts by community"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
         <label className="controls__closed">
           <input
             type="checkbox"
@@ -127,6 +144,9 @@ export default function App() {
       </div>
 
       <section className="board" aria-label="District scorecard">
+        {shown.length === 0 && (
+          <p className="loadstate">No districts match “{query.trim()}”.</p>
+        )}
         {shown.map((snap) => (
           <District
             key={snap.id}
