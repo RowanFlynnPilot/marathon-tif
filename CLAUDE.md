@@ -80,6 +80,9 @@ browser. Filings for report year N post March–July of year N+1.
   (e.g., 37106-001).
 - A district is `terminated` when it stops appearing in the index; its final
   filing may report all-zero Section 4 (wind-down).
+- `terminatedDate` is the *scheduled* statutory termination, not the actual
+  dissolution date. 37106-001 (Brokaw) left the index before 2019 yet files
+  2030-09-29, so the widget's "closed {year}" can post-date the real closure.
 
 ## Contract: public/data/districts.json
 
