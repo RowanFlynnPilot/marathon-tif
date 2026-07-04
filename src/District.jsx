@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { VERDICTS, money, moneyCompact, titleCase } from "./scorecard.js";
 import annotations from "./annotations.json";
 
@@ -84,13 +84,18 @@ function Lifecycle({ createdDate, terminationDate }) {
   );
 }
 
-export default function District({ snap, maxAbsOutlook }) {
-  const [open, setOpen] = useState(false);
+export default function District({ snap, maxAbsOutlook, initialOpen = false }) {
+  const [open, setOpen] = useState(initialOpen);
   const verdict = VERDICTS[snap.verdict];
   const ann = annotations[snap.id];
+  const rootRef = useRef(null);
+
+  useEffect(() => {
+    if (initialOpen && rootRef.current) rootRef.current.scrollIntoView();
+  }, []);
 
   return (
-    <div className={`district district--${snap.verdict}`}>
+    <div ref={rootRef} className={`district district--${snap.verdict}`}>
       <button
         className="district__row"
         onClick={() => setOpen(!open)}

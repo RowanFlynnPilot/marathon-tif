@@ -49,3 +49,6 @@ npm install
 npm run dev     # local dev server
 npm run build   # production build to dist/
 ```
+
+Deep links: `?district=<id>` (e.g. `?district=37291-003`) opens that
+district's drilldown on load and scrolls to it. Unknown ids are ignored.

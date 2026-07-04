@@ -2,6 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import District from "./District.jsx";
 import { SORTS, moneyCompact, snapshot, toplines } from "./scorecard.js";
 
+// Deep link for reporters: ?district=<id> expands that drilldown on load.
+// Read-only — expand/collapse never writes back to the URL.
+const deepLinkId = new URLSearchParams(window.location.search).get("district");
+
 const SORT_LABELS = {
   increment: "Increment",
   taxIncrement: "Taxes collected",
@@ -15,6 +19,13 @@ export default function App() {
   const [error, setError] = useState(null);
   const [sort, setSort] = useState("increment");
   const [showClosed, setShowClosed] = useState(false);
+
+  // A deep link to a terminated district would otherwise land on nothing.
+  useEffect(() => {
+    if (!data || !deepLinkId) return;
+    const target = data.districts.find((d) => d.id === deepLinkId);
+    if (target && target.status === "terminated") setShowClosed(true);
+  }, [data]);
 
   useEffect(() => {
     fetch(`${import.meta.env.BASE_URL}data/districts.json`)
@@ -117,7 +128,12 @@ export default function App() {
 
       <section className="board" aria-label="District scorecard">
         {shown.map((snap) => (
-          <District key={snap.id} snap={snap} maxAbsOutlook={maxAbsOutlook} />
+          <District
+            key={snap.id}
+            snap={snap}
+            maxAbsOutlook={maxAbsOutlook}
+            initialOpen={snap.id === deepLinkId}
+          />
         ))}
       </section>
 
