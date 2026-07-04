@@ -1,7 +1,39 @@
 {
-  "//": "DRAFT — every entry requires Shereen's sign-off before publication",
+  "//": "DRAFT — every entry requires Shereen's sign-off before publication. Source URLs for each entry: src/annotations.sources.md",
+  "37145-002": {
+    "name": "I-39 / Maple Ridge interchange",
+    "note": "A 331-acre mixed-use district on Kronenwetter's southwest side around the Maple Ridge Road interchange at Interstate 39."
+  },
+  "37151-001": {
+    "name": "Downtown / Hwy 29 business park",
+    "note": "Covers part of downtown Marathon City and the village business park along Highway 29, with a 2021 extension funding business park expansion."
+  },
+  "37176-002": {
+    "name": "Pavilion Marketplace area",
+    "note": "Tied to Rothschild's 2013 Pavilion Marketplace redevelopment plan, offering incentives for commercial and mixed-use redevelopment."
+  },
+  "37182-004": {
+    "name": "Hwy 153 business park & village",
+    "note": "Mixed-use district drawn in 2015 across much of the village, including a large part of the Highway 153 business and industrial park."
+  },
+  "37192-001": {
+    "name": "Hwy 29 corridor / Weston Business Park",
+    "note": "Covers the Highway 29 corridor including the Weston Business and Technology Park and the medical campus area; trustees voted in April 2026 to close it."
+  },
   "37291-003": {
     "name": "Downtown / Wausau Center site",
     "note": "Covers downtown Wausau, including the former Wausau Center mall site."
+  },
+  "37291-007": {
+    "name": "I-39 corridor commercial",
+    "note": "Created in 2006 to promote commercial development along the Interstate 39 corridor."
+  },
+  "37291-008": {
+    "name": "Near west side riverfront",
+    "note": "Rehabilitation district on Wausau's near west side, funding street reconstruction and west riverfront redevelopment."
+  },
+  "37291-010": {
+    "name": "Wausau West industrial park",
+    "note": "Covers the Wausau West Business and Industrial Park, site of the Great Lakes Cheese packaging plant announced in 2017."
   }
 }
