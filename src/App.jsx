@@ -29,7 +29,9 @@ export default function App() {
     if (target && target.status === "terminated") setShowClosed(true);
   }, [data]);
 
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
+    setError(null);
     fetch(`${import.meta.env.BASE_URL}data/districts.json`)
       .then((r) => {
         if (!r.ok) throw new Error(`data fetch failed: ${r.status}`);
@@ -37,7 +39,7 @@ export default function App() {
       })
       .then(setData)
       .catch((e) => setError(e.message));
-  }, []);
+  }, [attempt]);
 
   const snaps = useMemo(
     () => (data ? data.districts.map(snapshot) : []),
@@ -60,7 +62,12 @@ export default function App() {
   if (error) {
     return (
       <main className="wrap">
-        <p className="loadstate">Couldn't load district data ({error}). Reload to try again.</p>
+        <p className="loadstate">
+          Couldn't load district data ({error}).{" "}
+          <button className="retry" onClick={() => setAttempt(attempt + 1)}>
+            Try again
+          </button>
+        </p>
       </main>
     );
   }
