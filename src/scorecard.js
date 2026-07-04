@@ -27,6 +27,10 @@ export function snapshot(district) {
     verdict = fin.surplus < 0 ? "short" : "ahead";
   }
 
+  const termYear = district.terminationDate
+    ? Number(district.terminationDate.slice(0, 4))
+    : null;
+
   return {
     ...district,
     fin,
@@ -35,9 +39,14 @@ export function snapshot(district) {
     increment: val ? val.increment : null,
     taxIncrement: fin ? fin.taxIncrement : null,
     outlook: verdict === "ahead" || verdict === "short" ? fin.surplus : null,
-    termYear: district.terminationDate
-      ? Number(district.terminationDate.slice(0, 4))
-      : null,
+    termYear,
+    // Filings carry the *scheduled* statutory termination; a terminated
+    // district whose filed date sits beyond its final report never recorded
+    // an actual closing date, so the scheduled year would be misleading.
+    staleTermDate:
+      district.status === "terminated" &&
+      termYear !== null &&
+      termYear > district.lastReportYear + 1,
   };
 }
 

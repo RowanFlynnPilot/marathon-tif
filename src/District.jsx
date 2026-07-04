@@ -124,7 +124,11 @@ export default function District({ snap, maxAbsOutlook, initialOpen = false }) {
         <div className="cell cell--verdict">
           <span className={`chip chip--${snap.verdict}`}>{verdict.label}</span>
           <span className="cell__term">
-            {snap.status === "terminated" ? `closed ${snap.termYear}` : `to ${snap.termYear ?? "—"}`}
+            {snap.status === "terminated"
+              ? snap.staleTermDate
+                ? `last filed ${snap.lastReportYear}`
+                : `closed ${snap.termYear}`
+              : `to ${snap.termYear ?? "—"}`}
           </span>
         </div>
       </button>
@@ -134,12 +138,17 @@ export default function District({ snap, maxAbsOutlook, initialOpen = false }) {
           <p className="detail__blurb">
             {ann && `${ann.note} `}
             {verdict.blurb}. Created {snap.createdDate?.slice(0, 4) ?? "—"},{" "}
-            {snap.status === "terminated" ? "terminated" : "terminates"}{" "}
-            {snap.terminationDate?.slice(0, 4) ?? "—"}.
+            {snap.status === "terminated"
+              ? snap.staleTermDate
+                ? `last annual report filed ${snap.lastReportYear}`
+                : `terminated ${snap.terminationDate?.slice(0, 4) ?? "—"}`
+              : `terminates ${snap.terminationDate?.slice(0, 4) ?? "—"}`}.
             {snap.crossCounty &&
               ` ${titleCase(snap.municipality)} spans county lines: value shown is the Marathon County portion; finances cover the whole district${snap.filesUnderCounty !== "MARATHON" ? `, filed under ${titleCase(snap.filesUnderCounty)} County` : ""}.`}
           </p>
-          <Lifecycle createdDate={snap.createdDate} terminationDate={snap.terminationDate} />
+          {!snap.staleTermDate && (
+            <Lifecycle createdDate={snap.createdDate} terminationDate={snap.terminationDate} />
+          )}
           <div className="detail__charts">
             {snap.values.length > 1 && (
               <figure>
