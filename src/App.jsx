@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import District from "./District.jsx";
-import { SORTS, moneyCompact, snapshot, toplines } from "./scorecard.js";
+import { moneyCompact, snapshot, sortSnapshots, toplines } from "./scorecard.js";
 
 // Deep link for reporters: ?district=<id> expands that drilldown on load.
 // Read-only — expand/collapse never writes back to the URL.
@@ -18,6 +18,7 @@ export default function App() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [sort, setSort] = useState("increment");
+  const [sortDir, setSortDir] = useState(1);
   const [showClosed, setShowClosed] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -53,8 +54,8 @@ export default function App() {
           .includes(q)
       );
     }
-    return [...pool].sort(SORTS[sort]);
-  }, [snaps, sort, showClosed, query]);
+    return sortSnapshots(pool, sort, sortDir);
+  }, [snaps, sort, sortDir, showClosed, query]);
 
   if (error) {
     return (
@@ -118,10 +119,18 @@ export default function App() {
             <button
               key={key}
               className={`sortbtn ${sort === key ? "sortbtn--on" : ""}`}
-              onClick={() => setSort(key)}
+              onClick={() => {
+                if (sort === key) {
+                  setSortDir(-sortDir);
+                } else {
+                  setSort(key);
+                  setSortDir(1);
+                }
+              }}
               aria-pressed={sort === key}
             >
               {label}
+              {sort === key && (sortDir === 1 ? " ↓" : " ↑")}
             </button>
           ))}
         </div>

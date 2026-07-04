@@ -64,15 +64,30 @@ export function toplines(snapshots, latestValueYear) {
   };
 }
 
+// key extracts the sort value; desc is the default direction. Rows whose
+// key is null (no value rows, no outlook) always sort last, in either
+// direction — see sortSnapshots.
 export const SORTS = {
-  increment: (a, b) => (b.increment ?? -1) - (a.increment ?? -1),
-  taxIncrement: (a, b) => (b.taxIncrement ?? -1) - (a.taxIncrement ?? -1),
-  outlook: (a, b) => (a.outlook ?? Infinity) - (b.outlook ?? Infinity),
-  term: (a, b) => (a.termYear ?? Infinity) - (b.termYear ?? Infinity),
-  district: (a, b) =>
-    a.municipality.localeCompare(b.municipality) ||
-    a.tidNumber.localeCompare(b.tidNumber),
+  increment: { key: (s) => s.increment, desc: true },
+  taxIncrement: { key: (s) => s.taxIncrement, desc: true },
+  outlook: { key: (s) => s.outlook, desc: false },
+  term: { key: (s) => s.termYear, desc: false },
+  district: { key: (s) => `${s.municipality} ${s.tidNumber}`, desc: false },
 };
+
+export function sortSnapshots(pool, sortKey, flip) {
+  const { key, desc } = SORTS[sortKey];
+  const dir = (desc ? -1 : 1) * flip;
+  return [...pool].sort((a, b) => {
+    const ka = key(a);
+    const kb = key(b);
+    if (ka == null && kb == null) return 0;
+    if (ka == null) return 1;
+    if (kb == null) return -1;
+    const cmp = typeof ka === "string" ? ka.localeCompare(kb) : ka - kb;
+    return cmp * dir;
+  });
+}
 
 const dollarsFull = new Intl.NumberFormat("en-US", {
   style: "currency",
