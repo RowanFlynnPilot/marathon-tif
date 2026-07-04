@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>marathon-tif embed test</title>
+    <style>
+      body { margin: 0; background: #ccc; font-family: sans-serif; }
+      .before, .after { padding: 12px; background: #eee; }
+      iframe { display: block; width: 100%; border: 0; }
+      #status { position: fixed; top: 0; right: 0; background: #222; color: #fff; padding: 4px 10px; font: 12px monospace; }
+    </style>
+  </head>
+  <body>
+    <div id="status">no message yet</div>
+    <p class="before">Host content above the iframe.</p>
+    <iframe id="marathon-tif" src="/marathon-tif/" title="The TIF Scorecard"></iframe>
+    <p class="after">Host content below the iframe — should sit flush under the widget, no inner scrollbar.</p>
+    <script>
+      window.addEventListener("message", (event) => {
+        // Local test: skip the production origin check (dev server origin varies).
+        if (!event.data || event.data.source !== "marathon-tif") return;
+        document.getElementById("marathon-tif").style.height = event.data.height + "px";
+        document.getElementById("status").textContent = "height: " + event.data.height + "px";
+      });
+    </script>
+  </body>
+</html>
