@@ -46,16 +46,23 @@ function ChartTip({ x, width, children }) {
   );
 }
 
+// Thin labels when bands get tight (narrow phones): step 2, anchored so the
+// most recent year always keeps its label.
+function labelStep(gap) {
+  return gap < 38 ? 2 : 1;
+}
+
 function Sparkline({ values }) {
   const [ref, width] = useWidth();
   const [hover, setHover] = useState(null);
-  const h = 190, pad = 12, top = 52, bottom = 14;
+  const h = 210, pad = 14, top = 52, bottom = 30;
   const n = values.length;
   const max = Math.max(...values.map((v) => v.increment));
   const min = Math.min(...values.map((v) => v.increment), 0);
   const x = (i) => pad + (i / (n - 1)) * (width - 2 * pad);
   const y = (v) => h - bottom - ((v - min) / (max - min || 1)) * (h - top - bottom);
   const line = values.map((v, i) => `${x(i)},${y(v.increment)}`).join(" ");
+  const step = labelStep((width - 2 * pad) / (n - 1));
   const onMove = (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const frac = (e.clientX - rect.left - pad) / (rect.width - 2 * pad);
@@ -71,12 +78,20 @@ function Sparkline({ values }) {
             <polygon className="spark__area"
               points={`${x(0)},${h - bottom} ${line} ${x(n - 1)},${h - bottom}`} />
             <polyline points={line} fill="none" />
-            {hover === null ? (
-              <circle cx={x(n - 1)} cy={y(values[n - 1].increment)} r="4" />
-            ) : (
+            {values.map((v, i) => (
+              <g key={v.year}>
+                <circle cx={x(i)} cy={y(v.increment)} r={hover === i ? 5.5 : 3.5} />
+                {(n - 1 - i) % step === 0 && (
+                  <text x={x(i)} y={h - 8}
+                    textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"}>
+                    {v.year}
+                  </text>
+                )}
+              </g>
+            ))}
+            {hover !== null && (
               <g className="spark__hover">
                 <line x1={x(hover)} x2={x(hover)} y1={top - 8} y2={h - bottom} />
-                <circle cx={x(hover)} cy={y(values[hover].increment)} r="5" />
               </g>
             )}
           </svg>
@@ -128,9 +143,11 @@ function FinanceBars({ financials }) {
                     y={h - bottom - bh(f.taxIncrement)} height={bh(f.taxIncrement)} />
                   <rect className="finbars__debt" x={x0 + band * 0.52} width={band * 0.34}
                     y={h - bottom - bh(debt)} height={bh(debt)} />
-                  <text x={x0 + band / 2} y={h - 8} textAnchor="middle">
-                    {String(f.year).slice(2)}
-                  </text>
+                  {(n - 1 - i) % labelStep(band) === 0 && (
+                    <text x={x0 + band / 2} y={h - 8} textAnchor="middle">
+                      {f.year}
+                    </text>
+                  )}
                 </g>
               );
             })}

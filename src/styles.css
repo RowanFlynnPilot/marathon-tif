@@ -276,6 +276,7 @@ body {
 .spark { width: 100%; height: auto; display: block; }
 .spark polyline { stroke: var(--teal); stroke-width: 2.5; }
 .spark circle { fill: var(--teal-deep); }
+.spark text { font: 11px var(--mono); fill: var(--ink-soft); }
 .spark__area { fill: rgba(58, 134, 124, 0.09); }
 .spark__hover line { stroke: var(--ink-soft); stroke-dasharray: 3 3; }
 
