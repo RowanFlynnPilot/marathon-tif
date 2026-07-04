@@ -1,0 +1,32 @@
+name: Update TIF data
+
+on:
+  schedule:
+    - cron: "0 9 5 * *"  # 05th monthly, 09:00 UTC; DOR certifies values Aug 15, PE-300s post Mar-Jul
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install requests openpyxl
+
+      - run: python fetch_tif_data.py
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add public/data/districts.json
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "Data refresh: $(date -u +%Y-%m-%d)"
+          git push
