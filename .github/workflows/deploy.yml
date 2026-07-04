@@ -32,5 +32,12 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
+      # Pages intermittently answers "Deployment failed, try again later";
+      # one in-run retry beats a manual re-dispatch (re-running the job
+      # would duplicate the artifact, which deploy-pages rejects).
       - id: deployment
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      - id: deployment-retry
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v4
