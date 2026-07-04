@@ -5,7 +5,7 @@
   --paper: #fffdf8;
   --ink: #22302d;
   --ink-soft: #5c6b67;
-  --brick: #b0532f;
+  --brick: #a34a28; /* AA on the chip tint at 10.5px bold (4.8:1) */
   --rule: #ddd5c4;
   --display: "Fraunces", serif;
   --body: "Public Sans", system-ui, sans-serif;
