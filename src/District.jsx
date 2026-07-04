@@ -23,7 +23,7 @@ function BalanceBar({ outlook, maxAbs }) {
 
 function Sparkline({ values }) {
   if (values.length < 2) return null;
-  const w = 220, h = 56, pad = 4;
+  const w = 440, h = 100, pad = 6;
   const max = Math.max(...values.map((v) => v.increment));
   const min = Math.min(...values.map((v) => v.increment), 0);
   const x = (i) => pad + (i / (values.length - 1)) * (w - 2 * pad);
@@ -33,19 +33,19 @@ function Sparkline({ values }) {
     <svg viewBox={`0 0 ${w} ${h}`} className="spark" role="img"
       aria-label={`Increment ${values[0].year} to ${values[values.length - 1].year}`}>
       <polyline points={points} fill="none" />
-      <circle cx={x(values.length - 1)} cy={y(values[values.length - 1].increment)} r="3" />
+      <circle cx={x(values.length - 1)} cy={y(values[values.length - 1].increment)} r="4" />
     </svg>
   );
 }
 
 function FinanceBars({ financials }) {
-  const w = 220, h = 72, pad = 4;
+  const w = 440, h = 120, pad = 6;
   const max = Math.max(
     ...financials.map((f) => Math.max(f.taxIncrement, f.debtPrincipal + f.debtInterest)),
     1
   );
   const band = (w - 2 * pad) / financials.length;
-  const bh = (n) => ((h - 18) * n) / max;
+  const bh = (n) => ((h - 24) * n) / max;
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="finbars" role="img"
       aria-label="Tax increment collected vs. debt service by year">
@@ -55,10 +55,10 @@ function FinanceBars({ financials }) {
         return (
           <g key={f.year}>
             <rect className="finbars__incr" x={x0 + band * 0.14} width={band * 0.34}
-              y={h - 14 - bh(f.taxIncrement)} height={bh(f.taxIncrement)} />
+              y={h - 18 - bh(f.taxIncrement)} height={bh(f.taxIncrement)} />
             <rect className="finbars__debt" x={x0 + band * 0.52} width={band * 0.34}
-              y={h - 14 - bh(debt)} height={bh(debt)} />
-            <text x={x0 + band / 2} y={h - 3} textAnchor="middle">
+              y={h - 18 - bh(debt)} height={bh(debt)} />
+            <text x={x0 + band / 2} y={h - 4} textAnchor="middle">
               {String(f.year).slice(2)}
             </text>
           </g>
