@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { VERDICTS, money, moneyCompact, titleCase } from "./scorecard.js";
+import annotations from "./annotations.json";
 
 // Shared sqrt scale keeps ±$60K visible next to a −$5.2M outlier.
 function balanceWidth(amount, maxAbs) {
@@ -86,6 +87,7 @@ function Lifecycle({ createdDate, terminationDate }) {
 export default function District({ snap, maxAbsOutlook }) {
   const [open, setOpen] = useState(false);
   const verdict = VERDICTS[snap.verdict];
+  const ann = annotations[snap.id];
 
   return (
     <div className={`district district--${snap.verdict}`}>
@@ -95,7 +97,10 @@ export default function District({ snap, maxAbsOutlook }) {
         aria-expanded={open}
       >
         <div className="cell cell--name">
-          <span className="cell__muni">{titleCase(snap.municipality)} TID {snap.tidNumber.replace(/^0+/, "")}</span>
+          <span className="cell__muni">
+            {titleCase(snap.municipality)} TID {snap.tidNumber.replace(/^0+/, "")}
+            {ann && <span className="cell__place"> · {ann.name}</span>}
+          </span>
           <span className="cell__type">{snap.tidTypeDesc}</span>
         </div>
         <div className="cell cell--num">
@@ -122,6 +127,7 @@ export default function District({ snap, maxAbsOutlook }) {
       {open && (
         <div className="district__detail">
           <p className="detail__blurb">
+            {ann && `${ann.note} `}
             {verdict.blurb}. Created {snap.createdDate?.slice(0, 4) ?? "—"},{" "}
             {snap.status === "terminated" ? "terminated" : "terminates"}{" "}
             {snap.terminationDate?.slice(0, 4) ?? "—"}.
