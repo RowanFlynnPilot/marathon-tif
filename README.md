@@ -26,16 +26,26 @@ The widget posts its rendered height to the host page whenever it changes
 clipping or leaving dead space. Payload: `{ source: "marathon-tif",
 height: <number> }`.
 
+The snippet also forwards a `?district=<id>` query param from the article URL
+into the iframe, so deep links (see below) work inside a story, not just on
+the standalone page.
+
 ```html
 <iframe id="marathon-tif" src="https://rowanflynnpilot.github.io/marathon-tif/"
         style="width: 100%; border: 0;" title="The TIF Scorecard"></iframe>
 <script>
-  window.addEventListener("message", (event) => {
-    if (event.origin !== "https://rowanflynnpilot.github.io") return;
-    if (!event.data || event.data.source !== "marathon-tif") return;
-    document.getElementById("marathon-tif").style.height =
-      event.data.height + "px";
-  });
+  (function () {
+    var frame = document.getElementById("marathon-tif");
+    var district = new URLSearchParams(window.location.search).get("district");
+    if (district) {
+      frame.src += "?district=" + encodeURIComponent(district);
+    }
+    window.addEventListener("message", function (event) {
+      if (event.origin !== "https://rowanflynnpilot.github.io") return;
+      if (!event.data || event.data.source !== "marathon-tif") return;
+      frame.style.height = event.data.height + "px";
+    });
+  })();
 </script>
 ```
 
