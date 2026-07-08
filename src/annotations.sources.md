@@ -1,7 +1,8 @@
 # Annotation sources — for editorial review, not shipped
 
-Every entry in `annotations.json` is DRAFT until Shereen signs off. The
-notes below list the sources supporting each entry. Four researched
+All nine entries in `annotations.json` approved by Shereen 2026-07-07.
+Any new or edited entry requires the same sign-off before publication.
+The notes below list the sources supporting each entry. Four researched
 districts were omitted for lack of a source tying the TID number to a
 place: Wausau TID 11, Schofield TID 4, Mosinee TID 2, Hatley TID 1.
 
