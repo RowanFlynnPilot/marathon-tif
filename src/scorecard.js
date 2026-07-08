@@ -31,6 +31,10 @@ export function snapshot(district) {
     ? Number(district.terminationDate.slice(0, 4))
     : null;
 
+  // Sums cover the report window only (2018+); older districts collected
+  // plenty before the data begins, so display labels say "since {year}".
+  const cumTaxes = district.financials.reduce((s, f) => s + f.taxIncrement, 0);
+
   return {
     ...district,
     fin,
@@ -39,6 +43,9 @@ export function snapshot(district) {
     increment: val ? val.increment : null,
     taxIncrement: fin ? fin.taxIncrement : null,
     outlook: verdict === "ahead" || verdict === "short" ? fin.surplus : null,
+    cumTaxes,
+    firstFinYear: district.financials[0].year,
+    growth: val && val.baseValue > 0 ? val.currentValue / val.baseValue : null,
     termYear,
     // Filings carry the *scheduled* statutory termination; a terminated
     // district whose filed date sits beyond its final report never recorded
@@ -60,8 +67,16 @@ export function toplines(snapshots, latestValueYear) {
       0
     ),
     taxCollected: active.reduce((sum, s) => sum + s.fin.taxIncrement, 0),
+    // All districts, including since-closed ones — those taxes were still
+    // diverted while they were open.
+    cumTaxCollected: snapshots.reduce((sum, s) => sum + s.cumTaxes, 0),
     shortCount: active.filter((s) => s.verdict === "short").length,
   };
+}
+
+export function multiple(n) {
+  if (n === null || n === undefined) return "—";
+  return `${n >= 100 ? Math.round(n) : n.toFixed(1)}×`;
 }
 
 // key extracts the sort value; desc is the default direction. Rows whose

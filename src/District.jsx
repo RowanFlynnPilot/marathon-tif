@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { VERDICTS, money, moneyCompact, titleCase } from "./scorecard.js";
+import { VERDICTS, money, moneyCompact, multiple, titleCase } from "./scorecard.js";
 import annotations from "./annotations.json";
 
 // Shared sqrt scale keeps ±$60K visible next to a −$5.2M outlier.
@@ -318,6 +318,8 @@ export default function District({ snap, maxAbsOutlook, initialOpen = false }) {
           <dl className="detail__figures">
             <div><dt>Base value</dt><dd>{money(snap.val?.baseValue)}</dd></div>
             <div><dt>Current value</dt><dd>{money(snap.val?.currentValue)}</dd></div>
+            <div><dt>Value growth</dt><dd>{multiple(snap.growth)}</dd></div>
+            <div><dt>Taxes since {snap.firstFinYear}</dt><dd>{money(snap.cumTaxes)}</dd></div>
             <div><dt>Remaining costs</dt><dd>{money(snap.fin.futureProjectCosts)}</dd></div>
             <div><dt>Projected revenue</dt><dd>{money(snap.fin.futureProjectRevenue)}</dd></div>
             <div><dt>Fund balance</dt><dd>{money(snap.fin.endingBalance)}</dd></div>

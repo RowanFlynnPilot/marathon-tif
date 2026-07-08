@@ -113,6 +113,12 @@ export default function App() {
           </span>
         </div>
         <div className="ledger__item">
+          <span className="ledger__fig">{moneyCompact(top.cumTaxCollected)}</span>
+          <span className="ledger__label">
+            collected across all districts since {data.reportYears[0]}
+          </span>
+        </div>
+        <div className="ledger__item">
           <span className="ledger__fig ledger__fig--short">{top.shortCount} of {top.activeCount}</span>
           <span className="ledger__label">
             districts projected short by their own filings
