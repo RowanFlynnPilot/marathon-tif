@@ -7,8 +7,8 @@ data. Zero scraping risk — one direct Excel download and one public JSON API.
 ## Pipeline
 
 `fetch_tif_data.py` → `public/data/districts.json` → React 18/Vite widget →
-GitHub Pages → WordPress iframe. Monthly data cron
-(`.github/workflows/update-data.yml`, 5th at 09:00 UTC): fetch → sanity gate
+GitHub Pages → WordPress iframe. Weekly data cron
+(`.github/workflows/update-data.yml`, Mondays 09:00 UTC): fetch → sanity gate
 (`validate_data.py --previous`, which also diffs against the last commit) →
 commit only if DOR data changed → **explicitly dispatch** the Pages build
 (`.github/workflows/deploy.yml`). The explicit dispatch is load-bearing:
@@ -22,7 +22,8 @@ current one is required, the current year is optional until DOR publishes it
 (404 = not yet; 2025's posted 2025-09-26); report years through `year − 2` are
 required, the two most recent optional. `generated` means "data as of" — an
 unchanged refresh keeps the old stamp, so a data commit always means real
-change. A failed run opens (or comments on) a `TIF data refresh failed` issue.
+change. A failed run opens (or comments on) a `TIF data refresh failed` issue;
+the next successful run closes it, so an open issue means a sustained problem.
 
 ## Widget
 
@@ -99,9 +100,12 @@ browser. Filings for report year N post March–July of year N+1.
   one answers `{"result": "Error"}`; years further out answer
   `{"result": "Ok"}` with **no `subject` key at all**. "Open" therefore means
   `Ok` *and* a non-empty `comunlist` — never index `body["subject"]` blindly.
-- **DOR drops connections:** the 2026-07-05 run died on one 60s connect
-  timeout to `www.revenue.wi.gov`. The session retries transient transport
-  and 5xx errors with backoff; a sustained outage still fails loudly.
+- **`www.revenue.wi.gov` blocks GitHub runners intermittently:** connections
+  from Actions time out for minutes at a stretch (2026-07-05, 2026-09-05 — the
+  latter through five backoff retries) while the same requests succeed from a
+  home connection and `ww2.revenue.wi.gov` (Vault) has never failed. The
+  session retries transient errors, the job retries the whole fetch after a
+  10-minute pause, and the cron is weekly so a blocked run costs a week.
 
 ## Contract: public/data/districts.json
 

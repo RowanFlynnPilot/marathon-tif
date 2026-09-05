@@ -2,11 +2,14 @@ name: Update TIF data
 
 on:
   schedule:
-    - cron: "0 9 5 * *"  # 5th monthly, 09:00 UTC. Certifications post late summer/fall (2025's: Sep 26); PE-300s Mar-Jul.
+    # Weekly, not monthly: www.revenue.wi.gov intermittently blackholes
+    # GitHub runner IPs (2026-07-05, 2026-09-05), so a blocked run should
+    # cost a week, not a month. Unchanged data commits nothing.
+    - cron: "0 9 * * 1"  # Mondays 09:00 UTC
   workflow_dispatch:
     inputs:
       deploy:
-        description: "Redeploy the site even if the data is unchanged"
+        description: "Redeploy the site (committed data) even if the refresh finds no change or fails"
         type: boolean
         default: false
 
@@ -30,7 +33,16 @@ jobs:
       - name: Keep the last committed data for the diff guard
         run: cp public/data/districts.json "$RUNNER_TEMP/previous.json"
 
-      - run: python fetch_tif_data.py
+      # The script only writes its output at the very end, so a failed
+      # attempt leaves nothing behind and a retry after a pause is safe.
+      - name: Fetch from DOR (retrying a connection block after a pause)
+        run: |
+          for attempt in 1 2 3; do
+            python fetch_tif_data.py && exit 0
+            echo "::warning::attempt $attempt failed; waiting 10 minutes before retrying"
+            sleep 600
+          done
+          exit 1
 
       - name: Sanity-check the refreshed data
         run: python validate_data.py --previous "$RUNNER_TEMP/previous.json"
@@ -52,11 +64,24 @@ jobs:
 
       # Pushes made with GITHUB_TOKEN never trigger other workflows (GitHub's
       # recursion guard), so the Pages build must be dispatched explicitly.
-      - name: Deploy the refreshed data
-        if: steps.commit.outputs.changed == 'true' || inputs.deploy == true
+      # A forced deploy runs even after a failed fetch: it only rebuilds the
+      # data already committed on main.
+      - name: Deploy
+        if: ${{ !cancelled() && (steps.commit.outputs.changed == 'true' || inputs.deploy == true) }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run deploy.yml --repo "$GITHUB_REPOSITORY" --ref main
+
+      - name: Close the failure issue after a recovery
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for n in $(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+              --search "TIF data refresh failed in:title" --json number --jq '.[].number'); do
+            gh issue close "$n" --repo "$GITHUB_REPOSITORY" \
+              --comment "Recovered: the refresh succeeded on $(date -u +%Y-%m-%d)."
+          done
 
       - name: Open (or update) the failure issue
         if: failure()
@@ -72,5 +97,5 @@ jobs:
           else
             gh issue create --repo "$GITHUB_REPOSITORY" \
               --title "TIF data refresh failed ($(date -u +%Y-%m-%d))" \
-              --body "The scheduled data refresh failed — DOR may be unreachable, may have changed a file shape, or the sanity check rejected the output. Nothing was committed. Run: $run_url"
+              --body "The scheduled data refresh failed — DOR may be unreachable (www.revenue.wi.gov intermittently blocks GitHub runners), may have changed a file shape, or the sanity check rejected the output. Nothing was committed. This issue closes itself when a later run succeeds. Run: $run_url"
           fi
