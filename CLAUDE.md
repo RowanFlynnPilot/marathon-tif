@@ -8,9 +8,21 @@ data. Zero scraping risk — one direct Excel download and one public JSON API.
 
 `fetch_tif_data.py` → `public/data/districts.json` → React 18/Vite widget →
 GitHub Pages → WordPress iframe. Monthly data cron
-(`.github/workflows/update-data.yml`) commits refreshed JSON; any push to
-`main` triggers the Pages build (`.github/workflows/deploy.yml`), so a data
-refresh redeploys the site with no extra wiring.
+(`.github/workflows/update-data.yml`, 5th at 09:00 UTC): fetch → sanity gate
+(`validate_data.py --previous`, which also diffs against the last commit) →
+commit only if DOR data changed → **explicitly dispatch** the Pages build
+(`.github/workflows/deploy.yml`). The explicit dispatch is load-bearing:
+pushes made with `GITHUB_TOKEN` never trigger other workflows (GitHub's
+recursion guard) — the 2026-08-05 refresh pushed fine and never deployed.
+Human pushes to `main` trigger the deploy normally. `workflow_dispatch` on the
+data workflow takes a `deploy` input to force a redeploy.
+
+Year ranges are discovered, not hardcoded: every certification year before the
+current one is required, the current year is optional until DOR publishes it
+(404 = not yet; 2025's posted 2025-09-26); report years through `year − 2` are
+required, the two most recent optional. `generated` means "data as of" — an
+unchanged refresh keeps the old stamp, so a data commit always means real
+change. A failed run opens (or comments on) a `TIF data refresh failed` issue.
 
 ## Widget
 
@@ -83,6 +95,13 @@ browser. Filings for report year N post March–July of year N+1.
 - `terminatedDate` is the *scheduled* statutory termination, not the actual
   dissolution date. 37106-001 (Brokaw) left the index before 2019 yet files
   2030-09-29, so the widget's "closed {year}" can post-date the real closure.
+- **Unopened index years are inconsistent:** the year after the latest open
+  one answers `{"result": "Error"}`; years further out answer
+  `{"result": "Ok"}` with **no `subject` key at all**. "Open" therefore means
+  `Ok` *and* a non-empty `comunlist` — never index `body["subject"]` blindly.
+- **DOR drops connections:** the 2026-07-05 run died on one 60s connect
+  timeout to `www.revenue.wi.gov`. The session retries transient transport
+  and 5xx errors with backoff; a sustained outage still fails loudly.
 
 ## Contract: public/data/districts.json
 
