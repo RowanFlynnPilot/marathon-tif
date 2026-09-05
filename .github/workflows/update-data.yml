@@ -2,45 +2,75 @@ name: Update TIF data
 
 on:
   schedule:
-    - cron: "0 9 5 * *"  # 05th monthly, 09:00 UTC; DOR certifies values Aug 15, PE-300s post Mar-Jul
+    - cron: "0 9 5 * *"  # 5th monthly, 09:00 UTC. Certifications post late summer/fall (2025's: Sep 26); PE-300s Mar-Jul.
   workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Redeploy the site even if the data is unchanged"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
   issues: write
+  actions: write  # dispatching deploy.yml
 
 jobs:
   update:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
       - run: pip install requests openpyxl
 
+      - name: Keep the last committed data for the diff guard
+        run: cp public/data/districts.json "$RUNNER_TEMP/previous.json"
+
       - run: python fetch_tif_data.py
 
       - name: Sanity-check the refreshed data
-        run: python validate_data.py
+        run: python validate_data.py --previous "$RUNNER_TEMP/previous.json"
 
-      - name: Commit if changed
+      - id: commit
+        name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add public/data/districts.json
-          git diff --cached --quiet && echo "No changes" && exit 0
-          git commit -m "Data refresh: $(date -u +%Y-%m-%d)"
-          git push
+          if git diff --cached --quiet; then
+            echo "No changes"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "Data refresh: $(date -u +%Y-%m-%d)"
+            git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Open an issue on failure
+      # Pushes made with GITHUB_TOKEN never trigger other workflows (GitHub's
+      # recursion guard), so the Pages build must be dispatched explicitly.
+      - name: Deploy the refreshed data
+        if: steps.commit.outputs.changed == 'true' || inputs.deploy == true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy.yml --repo "$GITHUB_REPOSITORY" --ref main
+
+      - name: Open (or update) the failure issue
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh issue create \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "TIF data refresh failed ($(date -u +%Y-%m-%d))" \
-            --body "The scheduled data refresh failed — DOR may have changed a file shape, or the sanity check rejected the output. Nothing was committed. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "TIF data refresh failed in:title" --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" \
+              --body "Failed again $(date -u +%Y-%m-%d): $run_url"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "TIF data refresh failed ($(date -u +%Y-%m-%d))" \
+              --body "The scheduled data refresh failed — DOR may be unreachable, may have changed a file shape, or the sanity check rejected the output. Nothing was committed. Run: $run_url"
+          fi
