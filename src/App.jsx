@@ -50,10 +50,13 @@ export default function App() {
     let pool = showClosed ? snaps : snaps.filter((s) => s.status === "active");
     const q = query.trim().toLowerCase();
     if (q) {
+      // A query ending in a digit must end at a digit boundary, so "tid 1"
+      // doesn't also match TIDs 10–12; prefixes like "waus" still match.
+      const re = new RegExp(
+        q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + (/\d$/.test(q) ? "(?!\\d)" : "")
+      );
       pool = pool.filter((s) =>
-        `${s.municipality} tid ${s.tidNumber.replace(/^0+/, "")}`
-          .toLowerCase()
-          .includes(q)
+        re.test(`${s.municipality} tid ${s.tidNumber.replace(/^0+/, "")}`.toLowerCase())
       );
     }
     return sortSnapshots(pool, sort, sortDir);

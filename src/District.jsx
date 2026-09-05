@@ -174,16 +174,20 @@ function FinanceBars({ financials }) {
 function ChartTabs({ snap }) {
   const hasSpark = snap.values.length > 1;
   const [tab, setTab] = useState(hasSpark ? "increment" : "finance");
+  const panelId = `charts-${snap.id}`;
+  const tabId = `${panelId}-${tab}`;
   return (
     <div className="charts">
       {hasSpark && (
         <div className="charts__tabs" role="tablist" aria-label="District charts">
-          <button role="tab" aria-selected={tab === "increment"}
+          <button role="tab" id={`${panelId}-increment`} aria-selected={tab === "increment"}
+            aria-controls={panelId}
             className={`tabbtn ${tab === "increment" ? "tabbtn--on" : ""}`}
             onClick={() => setTab("increment")}>
             Increment value
           </button>
-          <button role="tab" aria-selected={tab === "finance"}
+          <button role="tab" id={`${panelId}-finance`} aria-selected={tab === "finance"}
+            aria-controls={panelId}
             className={`tabbtn ${tab === "finance" ? "tabbtn--on" : ""}`}
             onClick={() => setTab("finance")}>
             Taxes collected vs. debt
@@ -191,14 +195,15 @@ function ChartTabs({ snap }) {
         </div>
       )}
       {tab === "increment" ? (
-        <figure>
+        <figure role="tabpanel" id={panelId} aria-labelledby={tabId}>
           <Sparkline values={snap.values} />
           <figcaption>
             Increment, {snap.values[0].year}–{snap.val.year}: {money(snap.values[0].increment)} → {money(snap.val.increment)}
           </figcaption>
         </figure>
       ) : (
-        <figure>
+        <figure role={hasSpark ? "tabpanel" : undefined} id={panelId}
+          aria-labelledby={hasSpark ? tabId : undefined}>
           <FinanceBars financials={snap.financials} />
           <figcaption>
             <span className="key key--incr">tax increment</span> vs{" "}
@@ -292,7 +297,7 @@ export default function District({ snap, maxAbsOutlook, initialOpen = false }) {
             {snap.status === "terminated"
               ? snap.staleTermDate
                 ? `last filed ${snap.lastReportYear}`
-                : `closed ${snap.termYear}`
+                : `closed ${snap.termYear ?? "—"}`
               : `to ${snap.termYear ?? "—"}`}
           </span>
         </div>
