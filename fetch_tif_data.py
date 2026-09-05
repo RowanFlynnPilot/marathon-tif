@@ -25,10 +25,12 @@ from pathlib import Path
 
 import openpyxl
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 COUNTY = "MARATHON"
-VALUE_YEARS = range(2019, 2026)   # xlsx certifications available 2019+
-REPORT_YEARS = range(2018, 2026)  # PE-300 API available 2018+
+FIRST_VALUE_YEAR = 2019   # xlsx certifications available 2019+
+FIRST_REPORT_YEAR = 2018  # PE-300 API available 2018+
 
 VALUES_URL = "https://www.revenue.wi.gov/SLFReportstif/{year}tifcomun.xlsx"
 VAULT = "https://ww2.revenue.wi.gov/VaultPublic"
@@ -42,6 +44,13 @@ SESSION = requests.Session()
 SESSION.headers["User-Agent"] = (
     "WausauPilotReview-TIF-Scorecard/1.0 (civic data; tech@wausaupilotandreview.com)"
 )
+# DOR occasionally refuses a connection outright (the 2026-07-05 run died on a
+# single connect timeout). Retry transient transport and 5xx failures with
+# backoff; anything persistent still raises and kills the run.
+SESSION.mount("https://", HTTPAdapter(max_retries=Retry(
+    total=4, connect=4, read=4, status=4, backoff_factor=2,
+    status_forcelist=(429, 500, 502, 503, 504), allowed_methods=("GET", "HEAD"),
+)))
 
 
 def get(url: str, **kwargs) -> requests.Response:
@@ -79,6 +88,26 @@ def mdy_to_iso(value: str | None) -> str | None:
     return datetime.strptime(value.replace("-", "/"), "%m/%d/%Y").date().isoformat()
 
 
+def certification_published(year: int) -> bool:
+    """Certifications post once a year, late summer to fall. 404 = not yet."""
+    resp = SESSION.head(VALUES_URL.format(year=year), timeout=60)
+    if resp.status_code == 404:
+        return False
+    resp.raise_for_status()
+    return True
+
+
+def discover_value_years(today) -> list[int]:
+    """Every year before this one must exist; this year's file is optional
+    until DOR publishes it (2025's posted 2025-09-26)."""
+    years = list(range(FIRST_VALUE_YEAR, today.year))
+    if certification_published(today.year):
+        years.append(today.year)
+    else:
+        print(f"[values] {today.year} not yet published", flush=True)
+    return years
+
+
 def fetch_values(year: int) -> list[dict]:
     """Parse one certification workbook, return all rows statewide.
 
@@ -111,20 +140,26 @@ def fetch_values(year: int) -> list[dict]:
     return out
 
 
-def fetch_index(year: int) -> list[dict]:
-    """Return the statewide TID roster for one report year.
+def fetch_index(year: int) -> list[dict] | None:
+    """Return the statewide TID roster for one report year, or None if DOR
+    has not opened that year yet.
 
     Statewide, not county-filtered: cross-county municipalities (Abbotsford,
     Marshfield) file each TID's PE-300 under a single co-muni code that may
     sit in the neighboring county, so resolution needs the full roster.
+
+    Unopened years answer {"result": "Error"} (next year) or {"result": "Ok"}
+    with no subject at all (further out), so "open" means Ok *and* a
+    non-empty roster.
     """
     print(f"[index] {year}", flush=True)
     body = get(INDEX_URL.format(year=year)).json()
-    if body["result"] != "Ok":
-        raise RuntimeError(f"index {year} returned {body['result']}")
+    roster = (body.get("subject") or {}).get("comunlist") if body.get("result") == "Ok" else None
+    if not roster:
+        return None
 
     entries = []
-    for muni in body["subject"]["comunlist"]:
+    for muni in roster:
         for tid in muni["tidData"]:
             entries.append({
                 "year": year,
@@ -140,6 +175,25 @@ def fetch_index(year: int) -> list[dict]:
                 "filed": tid["submissionStatus"] == "Filed",
             })
     return entries
+
+
+def fetch_indexes(today) -> dict[int, list[dict]]:
+    """Report year N opens in N+1 (filings post Mar-Jul), so every year through
+    today.year - 2 must be open; the two most recent are optional, probed in
+    order, stopping at the first that is not."""
+    indexes = {}
+    for year in range(FIRST_REPORT_YEAR, today.year - 1):
+        entries = fetch_index(year)
+        if entries is None:
+            raise RuntimeError(f"index {year} is required but DOR returned no roster")
+        indexes[year] = entries
+    for year in (today.year - 1, today.year):
+        entries = fetch_index(year)
+        if entries is None:
+            print(f"[index] {year} not yet open", flush=True)
+            break
+        indexes[year] = entries
+    return indexes
 
 
 def fetch_report(entry: dict) -> dict:
@@ -177,8 +231,12 @@ def fetch_report(entry: dict) -> dict:
 
 
 def build() -> dict:
-    values = [row for year in VALUE_YEARS for row in fetch_values(year)]
-    index = [row for year in REPORT_YEARS for row in fetch_index(year)]
+    today = datetime.now(timezone.utc).date()
+    value_years = discover_value_years(today)
+    values = [row for year in value_years for row in fetch_values(year)]
+    indexes = fetch_indexes(today)
+    report_years = sorted(indexes)
+    index = [row for year in report_years for row in indexes[year]]
 
     districts: dict[str, dict] = {}
     all_values, values = values, [r for r in values if r["county"] == COUNTY]
@@ -254,7 +312,7 @@ def build() -> dict:
             ("year", "baseYear", "currentValue", "baseValue", "increment")
         })
 
-    latest_report_year = max(REPORT_YEARS)
+    latest_report_year = max(report_years)
     for district in districts.values():
         district["status"] = ("active" if district["lastReportYear"] == latest_report_year
                               else "terminated")
@@ -264,8 +322,8 @@ def build() -> dict:
     return {
         "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "county": COUNTY,
-        "valueYears": [min(VALUE_YEARS), max(VALUE_YEARS)],
-        "reportYears": [min(REPORT_YEARS), max(REPORT_YEARS)],
+        "valueYears": [min(value_years), max(value_years)],
+        "reportYears": [min(report_years), max(report_years)],
         "districts": sorted(districts.values(),
                             key=lambda d: (d["municipality"], d["tidNumber"])),
     }
@@ -273,6 +331,14 @@ def build() -> dict:
 
 def main() -> None:
     data = build()
+    if OUT_PATH.exists():
+        previous = json.loads(OUT_PATH.read_text())
+        # `generated` means "data as of": a refresh that found nothing new keeps
+        # the old stamp, so the monthly run only commits when DOR data changed.
+        if all(previous.get(k) == data[k]
+               for k in ("county", "valueYears", "reportYears", "districts")):
+            data["generated"] = previous["generated"]
+            print(f"no changes since {previous['generated']}", flush=True)
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUT_PATH.write_text(json.dumps(data, indent=1))
     active = sum(1 for d in data["districts"] if d["status"] == "active")
