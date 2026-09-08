@@ -7,8 +7,10 @@ data. Zero scraping risk — one direct Excel download and one public JSON API.
 ## Pipeline
 
 `fetch_tif_data.py` → `public/data/districts.json` → React 18/Vite widget →
-GitHub Pages → WordPress iframe. Weekly data cron
-(`.github/workflows/update-data.yml`, Mondays 09:00 UTC): fetch → sanity gate
+GitHub Pages → WordPress iframe. Data cron
+(`.github/workflows/update-data.yml`) fires daily at 09:00 UTC but a `gate`
+job does real work only on Mondays — or on any day while a failure issue is
+open, so a blocked run retries the next day instead of waiting a week: fetch → sanity gate
 (`validate_data.py --previous`, which also diffs against the last commit) →
 commit only if DOR data changed → **explicitly dispatch** the Pages build
 (`.github/workflows/deploy.yml`). The explicit dispatch is load-bearing:
@@ -24,6 +26,9 @@ required, the two most recent optional. `generated` means "data as of" — an
 unchanged refresh keeps the old stamp, so a data commit always means real
 change. A failed run opens (or comments on) a `TIF data refresh failed` issue;
 the next successful run closes it, so an open issue means a sustained problem.
+That issue is **load-bearing, not just a notification**: its open/closed state
+is what tells the daily gate whether to retry. Don't close one by hand while
+the underlying problem stands.
 
 ## Widget
 
@@ -100,12 +105,15 @@ browser. Filings for report year N post March–July of year N+1.
   one answers `{"result": "Error"}`; years further out answer
   `{"result": "Ok"}` with **no `subject` key at all**. "Open" therefore means
   `Ok` *and* a non-empty `comunlist` — never index `body["subject"]` blindly.
-- **`www.revenue.wi.gov` blocks GitHub runners intermittently:** connections
-  from Actions time out for minutes at a stretch (2026-07-05, 2026-09-05 — the
-  latter through five backoff retries) while the same requests succeed from a
-  home connection and `ww2.revenue.wi.gov` (Vault) has never failed. The
-  session retries transient errors, the job retries the whole fetch after a
-  10-minute pause, and the cron is weekly so a blocked run costs a week.
+- **`www.revenue.wi.gov` blocks GitHub runners for hours:** connections from
+  Actions time out (2026-07-05, -09-05, -09-07) while the same requests
+  succeed instantly from a home connection; `ww2.revenue.wi.gov` (Vault) has
+  never failed. On 2026-09-07 the block outlasted a 47-minute run — three
+  attempts, each through five backoff retries — so **in-run retrying does not
+  fix this**; recovery comes from a later run, which is why the gate retries
+  daily while a failure issue is open. If a run ever fails on a *stale* file
+  (a 200 with unexpected contents) rather than a connect timeout, that is a
+  different problem — read the traceback, don't assume the block.
 
 ## Contract: public/data/districts.json
 

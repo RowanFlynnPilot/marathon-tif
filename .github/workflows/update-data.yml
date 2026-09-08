@@ -2,10 +2,11 @@ name: Update TIF data
 
 on:
   schedule:
-    # Weekly, not monthly: www.revenue.wi.gov intermittently blackholes
-    # GitHub runner IPs (2026-07-05, 2026-09-05), so a blocked run should
-    # cost a week, not a month. Unchanged data commits nothing.
-    - cron: "0 9 * * 1"  # Mondays 09:00 UTC
+    # Daily, but the gate job below does real work only on Mondays — or any
+    # day while a failure issue is open. www.revenue.wi.gov blackholes GitHub
+    # runner IPs for hours at a time (2026-07-05, -09-05, -09-07), so
+    # recovery has to come from a later run, not from retrying within one.
+    - cron: "0 9 * * *"  # 09:00 UTC; GitHub often starts scheduled runs hours late
   workflow_dispatch:
     inputs:
       deploy:
@@ -19,7 +20,33 @@ permissions:
   actions: write  # dispatching deploy.yml
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.check.outputs.go }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" != "schedule" ]; then
+            echo "Manual dispatch — running."
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          elif [ "$(date -u +%u)" = "1" ]; then
+            echo "Monday — running the weekly refresh."
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          elif [ -n "$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+              --search 'TIF data refresh failed in:title' --json number --jq '.[0].number')" ]; then
+            echo "A refresh failure is still open — retrying today."
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Not Monday and nothing failing — nothing to do."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          fi
+
   update:
+    needs: gate
+    if: needs.gate.outputs.go == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -35,12 +62,16 @@ jobs:
 
       # The script only writes its output at the very end, so a failed
       # attempt leaves nothing behind and a retry after a pause is safe.
-      - name: Fetch from DOR (retrying a connection block after a pause)
+      # This catches short blips only; a sustained block is left to the
+      # next day's run.
+      - name: Fetch from DOR (retrying a short block after a pause)
         run: |
           for attempt in 1 2 3; do
-            python fetch_tif_data.py && exit 0
-            echo "::warning::attempt $attempt failed; waiting 10 minutes before retrying"
-            sleep 600
+            if python fetch_tif_data.py; then exit 0; fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "::warning::attempt $attempt failed; waiting 10 minutes before retrying"
+              sleep 600
+            fi
           done
           exit 1
 
@@ -97,5 +128,5 @@ jobs:
           else
             gh issue create --repo "$GITHUB_REPOSITORY" \
               --title "TIF data refresh failed ($(date -u +%Y-%m-%d))" \
-              --body "The scheduled data refresh failed — DOR may be unreachable (www.revenue.wi.gov intermittently blocks GitHub runners), may have changed a file shape, or the sanity check rejected the output. Nothing was committed. This issue closes itself when a later run succeeds. Run: $run_url"
+              --body "The scheduled data refresh failed — DOR may be unreachable (www.revenue.wi.gov intermittently blocks GitHub runners), may have changed a file shape, or the sanity check rejected the output. Nothing was committed. This run will retry daily and the issue closes itself once a run succeeds. Run: $run_url"
           fi
